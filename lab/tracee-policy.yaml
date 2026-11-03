@@ -1,0 +1,29 @@
+apiVersion: tracee.aquasec.com/v1beta1
+kind: Policy
+metadata:
+  name: container-runtime-policy
+  annotations:
+    description: "Runtime policy: container network monitoring - syscalls + LSM + TCP packets/flows (eBPF agent)"
+spec:
+  scope:
+    - container
+  rules:
+    - event: socket
+    - event: bind
+    - event: listen
+    - event: connect
+    - event: accept4
+    - event: setsockopt
+    - event: sendto
+    - event: sendmsg
+    - event: recvfrom
+    - event: recvmsg
+    - event: close
+    - event: security_socket_create
+    - event: security_socket_bind
+    - event: security_socket_listen
+    - event: security_socket_connect
+    - event: security_socket_accept
+    - event: net_packet_tcp
+    - event: net_flow_tcp_begin
+    - event: net_flow_tcp_end

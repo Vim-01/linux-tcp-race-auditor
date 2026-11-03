@@ -1,0 +1,29 @@
+# Lab attack configuration for cve2026-98432-exp (VPS, KASAN 6.1.189)
+# Target: listener container on docker default bridge (first container = 172.17.0.2)
+# Use ONLY in an isolated lab environment. See DISCLAIMER.md.
+
+[general]
+lang = "en"        # en | ru
+dry_run = false    # true = print packets, send nothing
+cli = false        # TUI; use `--cli` on the command line for headless
+
+[target]
+ip = "172.17.0.2"     # listener container IP (check with docker inspect)
+port = 9000           # nc -lp 9000
+kernel_version = "6.1.189"   # informational only
+mode = "hammer"      # hammer | spray | mptcp
+
+[payload]
+options_preset = "ts"     # nop | ts | rr | ssrr | custom
+custom_options_hex = ""
+ttl = 64
+window = 65535
+tcp_common_options = true
+source_ip = ""            # auto = sender container egress (172.17.0.3)
+df_only = true
+
+[timing]
+delta_us = 150       # SYN -> retransmit delay (reference PoC: 100-200 us)
+flows = 32           # parallel 4-tuples (~3200 SYN/s -> ~190k SYN per 60 s)
+flow_gap_ms = 10
+duration_sec = 60    # P(hit) ~ 99.9% at reference hit rate 6.5e-5/SYN

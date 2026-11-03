@@ -1,0 +1,29 @@
+[listener] events log: /tmp/events.log
+[listener] 0.0.0.0:9000: NO accept loop: children stay in the accept queue (backlog-capped; RST leaves them queued in TCP_CLOSE on 6.1.189); queue drained on shutdown (fire #16b)
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+listener 0.0.0.0:9000: accepted=0 held=0 released=0
+[listener] interrupted, closing
+[listener] done: accepted=5 released=0

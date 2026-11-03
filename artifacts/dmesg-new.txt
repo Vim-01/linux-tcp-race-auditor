@@ -1,0 +1,1 @@
+[  187.408937] device docker0 left promiscuous mode
